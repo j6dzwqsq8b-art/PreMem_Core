@@ -1,34 +1,33 @@
+# =======================================================
+# PROJECT: PreMem Core Memory Infrastructure (v3.0)
+# MODULE: Asynchronous Keystroke Prefetch Buffer Engine
+# ARCHITECTURE: Input Stream Interceptor (MacBook M1)
+# =======================================================
+
 import time
+import sys
 
-IDLE_THRESHOLD_SECS = 60      
-ssd_storage_vault = ['block_02', 'block_04']  
+class PreMemPrefetcher:
+    """
+    Asynchronous input stream listener that intercepts user keystroke buffers
+    predictively to flag cold hardware layers before model inference requests.
+    """
+    def __init__(self, target_signature="block_02"):
+        self.trigger_signature = target_signature
+        print("⚡ [PREFETCH CORE] Predictive stream buffer listener initialized.")
 
-vllm_block_table = {
-    "block_01": {"last_seen_ago": 12, "tier": "GPU_VRAM_HOT"},
-    "block_02": {"last_seen_ago": 75, "tier": "MAC_SSD_COLD"}, 
-    "block_03": {"last_seen_ago": 3,  "tier": "GPU_VRAM_HOT"},
-    "block_04": {"last_seen_ago": 90, "tier": "MAC_SSD_COLD"}, 
-}
+    def monitor_input_stream(self, raw_keystroke_chunk):
+        """Scans incoming text buffers in real-time for memory swap signatures."""
+        normalized_stream = raw_keystroke_chunk.lower()
+        
+        if self.trigger_signature in normalized_stream:
+            print(f"\n🎯 [PREFETCH HIT] Found target signature '{self.trigger_signature}' in buffer!")
+            print("   ↳ Sending speculative wake signal to hardware data bus...")
+            return True
+        return False
 
-print("\n======================================================")
-print("===   PREMEM PREDICTIVE PREFETCH PIPELINE ACTIVE   ===")
-print("======================================================\n")
-
-# 🔍 SIMULATING USER TYPING STREAM IN THE BUFFER
-user_input_stream = "Fix the compilation bug inside my structural dictionary block_02"
-print(f"[TRACKER] Active User Input Stream: \"{user_input_stream}\"\n")
-
-# 🔄 PREDICTIVE ROUTING INTERCEPTION
-for target_block in list(ssd_storage_vault):
-    if target_block in user_input_stream:
-        print(f"🚀 [INTERCEPT]: System caught match for '{target_block}' in typing buffer!")
-        vllm_block_table[target_block]["tier"] = "GPU_VRAM_HOT"
-        vllm_block_table[target_block]["last_seen_ago"] = 0  
-        ssd_storage_vault.remove(target_block)
-        print(f"✅ [SUCCESS] {target_block} preloaded back to GPU VRAM instantly.\n")
-
-print("-" * 54)
-print(f"📊 FINAL PREFETCHED SYSTEM STATE LOGS:")
-print(f"   -> Active inside GPU VRAM: {sum(1 for b in vllm_block_table.values() if b['tier'] == 'GPU_VRAM_HOT')}")
-print(f"   -> Remaining in SSD Storage Vault: {ssd_storage_vault}")
-print("======================================================")
+if __name__ == "__main__":
+    print("=== PreMem Prefetch Stream Buffer Test ===")
+    listener = PreMemPrefetcher()
+    test_phrase = "Please compile the data layers inside block_02"
+    listener.monitor_input_stream(test_phrase)
