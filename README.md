@@ -1,3 +1,4 @@
+! [PreMem Live UI Dashboard Layout] (dashboard.png)
 # PreMem: Asynchronous VRAM Caching Engine for Local LLMs
 
 PreMem is an active, multi-tier memory management architecture designed to maximize local Large Language Model (LLM) execution efficiency under rigid hardware boundaries. By implementing predictive prefetching and dynamic, bi-directional memory swapping, PreMem acts as an autonomous runtime middleware layer that prevents VRAM fragmentation and out-of-memory crashes on consumer devices.
