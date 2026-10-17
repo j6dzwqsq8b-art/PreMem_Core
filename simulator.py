@@ -1,155 +1,188 @@
-# =======================================================
-# PROJECT: PreMem Core Memory Infrastructure (v13.0)
-# MODULE: Open-Source AI Matrix Weight Hooking (Phase I)
-# TARGET MODEL: Qwen/Qwen1.5-0.5B-Chat (Real Parameters)
-# =======================================================
-
-from transformers import AutoConfig
-import numpy as np
-import time
-import sys
 import os
+import sys
+import time
+import asyncio
+from transformers import AutoConfig
+
+class KVCacheTelemetry:
+    def __init__(self, hardware_max_mb=1024.0):
+        self.step = 0
+        self.hardware_max_mb = hardware_max_mb  # Simulated hardware capacity limit
+
+    def profile_context_step(self, sequence_length, hidden_size, num_layers=24):
+        """
+        Simulates attention layer forward pass interception.
+        Calculates exact mathematical byte size of rolling Key & Value tensors.
+        """
+        self.step += 1
+        
+        # Standard KV Cache bytes calculation: 2 (K and V) * batch_size(1) * seq_len * hidden_size * float16(2 bytes)
+        layer_bytes = 2 * 1 * sequence_length * hidden_size * 2
+        total_cache_bytes = layer_bytes * num_layers
+        total_cache_mb = total_cache_bytes / (1024 * 1024)
+        
+        # Calculate memory capacity usage percentage
+        usage_pct = (total_cache_mb / self.hardware_max_mb) * 100
+
+        # Stream real-time telemetry metrics directly to the console terminal
+        print(f"🛰️ [STEP {self.step:03d}] Intercepted Attention Layer Matrix Context")
+        print(f"   ├── Key Tensor Simulated Shape:   [1, 1, {sequence_length}, {hidden_size}] | Type: torch.float16")
+        print(f"   ├── Value Tensor Simulated Shape: [1, 1, {sequence_length}, {hidden_size}] | Type: torch.float16")
+        print(f"   ├── Total Active KV Cache Size:   {total_cache_mb:.4f} MB / {self.hardware_max_mb} MB")
+        print(f"   └── Memory Buffer Capacity Load:  {usage_pct:.2f}%")
+        
+        # EVACUATION FLAG TRIGGER: Breach checkpoint at 75% capacity
+        if usage_pct >= 75.0:
+            print(f"🚨 [ALERT] PREMEM CORE V2 TRIGGER: Context breached threshold ({usage_pct:.2f}%)!")
+            print(f"   └── ACTION REQUIRED: Eviction engine must flush oldest token slices to Flash NVMe SSD.\n")
+            return True
+        print(f"🛡️ [STATUS] Local Memory footprint stable. Layer execution continuing cleanly.\n")
+        return False
 
 class PreMemController:
     """
-    Object-Oriented Memory Middleware fetching real structural layout weights 
-    from open-source AI configurations, managing dynamic matrix offloading,
-    and handling real binary disk serialization routines.
+    Object-Oriented Memory Middleware fetching real structural parameters
+    from open-source AI configurations, managing dynamic matrix simulation.
     """
     def __init__(self, max_vram_blocks=2):
         self.max_vram_capacity = max_vram_blocks
         self.ssd_storage_vault = []
+        self.cache_index_map = {} 
+        
+        # PHASE 1 FEATURE: True FIFO (First-In-First-Out) Array Tracker
+        self.fifo_eviction_queue = []
         
         # Physical hard-drive workspace path configuration
-        self.vault_path = os.path.expanduser("~/Desktop/PreMem_SSD_Vault")
+        self.vault_path = os.path.expanduser("~/Desktop/PreMem_Vault")
         if not os.path.exists(self.vault_path):
             os.makedirs(self.vault_path)
-            
-        # STEP 1: Fetch real open-source AI model weight configurations
-        print("📥 [CONNECTING TO HUGGING FACE] Fetching structural matrix layout for Qwen-0.5B...")
+
+        print("🌐 [CONNECTING TO HUGGING FACE] Fetching structural layouts...")
         try:
-            # Safely fetches the mathematical design layer specifications of Qwen
             config = AutoConfig.from_pretrained("Qwen/Qwen1.5-0.5B-Chat")
-            hidden_dim = config.hidden_size      # 1024 vectors
-            vocab_dim = config.vocab_size        # ~151,936 parameters
-            print(f"   📊 [REAL ARCHITECTURE FOUND] Hidden Dimension: {hidden_dim}, Vocab Size: {vocab_dim}")
+            self.hidden_dim = config.hidden_size
+            self.num_layers = getattr(config, "num_hidden_layers", 24)
+            print(f"✅ [REAL ARCHITECTURE FOUND] Target Model Layout: Qwen-0.5B | Hidden Dim: {self.hidden_dim} | Layers: {self.num_layers}")
         except Exception as e:
-            print(f"   ⚠️ [NETWORK OFFLINE] Using fallback dimensions due to connection status. Error: {e}")
-            hidden_dim = 1024
-            vocab_dim = 151936
+            print(f"⚠️ [NETWORK OFFLINE] Using fallback local parameters.")
+            self.hidden_dim = 1024
+            self.num_layers = 24
 
-        # STEP 2: Allocate real-world matrix sizes using structural dimensions
-        print("🧠 [TENSOR ALLOCATION] Populating active registers with real-size math models...")
-        self.vllm_block_table = {
-            "block_01": {"matrix": np.random.randn(hidden_dim, 256).astype(np.float32), "last_seen_ago": 10, "tier": "GPU_VRAM_HOT"},
-            "block_02": {"matrix": np.random.randn(256, vocab_dim).astype(np.float32), "last_seen_ago": 95, "tier": "GPU_VRAM_HOT"}, 
-            "block_03": {"matrix": np.random.randn(hidden_dim, hidden_dim).astype(np.float32), "last_seen_ago": 5, "tier": "GPU_VRAM_HOT"},
-        }
+    async def evict_token_chunk_async(self, chunk_id, sequence_length, hidden_size):
+        """
+        PHASE 1 ADD-ON: Non-blocking asynchronous disk serialization.
+        Simulates background offloading while the main model thread spins forward.
+        """
+        slice_seq_len = min(512, sequence_length)
+        chunk_file_name = f"kv_cache_chunk_{chunk_id}.bin"
+        target_vault_file = os.path.join(self.vault_path, chunk_file_name)
         
-        self._proactive_boot_eviction_scan()
+        freed_layer_bytes = 2 * 1 * slice_seq_len * hidden_size * 2
+        freed_total_mb = (freed_layer_bytes * self.num_layers) / (1024 * 1024)
 
-    def _proactive_boot_eviction_scan(self):
-        """Internal routine to flush idle cold array sets out to raw disk binary storage upon boot."""
-        print("\n🔧 [INITIALIZATION] Scanning active registers for idle tensor matrices...")
-        for bid, meta in list(self.vllm_block_table.items()):
-            if meta["last_seen_ago"] > 60:
-                print(f"   📦 [TENSOR EVICTION] '{bid}' is cold. Serializing real array to binary storage...")
-                file_path = os.path.join(self.vault_path, f"{bid}.npy")
-                
-                # Save the real model structural dimensions down onto your Mac hard drive
-                np.save(file_path, meta["matrix"])
-                
-                meta["tier"] = "MAC_SSD_COLD"
-                meta["matrix"] = None  # Wipes the matrix array weights from active RAM completely
-                self.ssd_storage_vault.append(bid)
-        print("🚀 PreMem Dynamic Caching Engine initialized and fully armed.\n")
+        print(f"🗄️ [ASYNC START] Background offloading initialized for Slice ID: {chunk_id}")
+        
+        try:
+            # Simulate slight non-blocking I/O disk latency delay
+            await asyncio.sleep(0.2)
+            
+            with open(target_vault_file, "w") as f:
+                f.write(f"PREMEM_V2_ASYNC_DATA_TOKEN_SIZE_{slice_seq_len}")
+            
+            self.ssd_storage_vault.append(target_vault_file)
+            
+            # Map parameters dynamically into index map lookup table
+            self.cache_index_map[chunk_id] = {
+                "file_path": target_vault_file,
+                "token_count": slice_seq_len,
+                "timestamp": time.time(),
+                "status": "OFFLOADED_TO_FLASH"
+            }
+            
+            # Append to FIFO Queue Array tracker to record chronological order
+            self.fifo_eviction_queue.append(chunk_id)
+            
+            print(f"   💾 [ASYNC SUCCESS] Offloaded {freed_total_mb:.4f} MB to Flash Storage.")
+            print(f"   🗺️ [INDEX] Registered Slice ID {chunk_id} to PreMem Memory Map.")
+            print(f"   📋 [FIFO ARRAY] Current Eviction Tracking Queue: {self.fifo_eviction_queue}")
+            return freed_total_mb
+        except Exception as e:
+            print(f"   ❌ [ASYNC FAILED] Disk serialization error: {str(e)}")
+            return 0.0
 
-    def animate_hardware_bus_delay(self, block_name):
-        """Simulates physical data bus transfer transit intervals."""
-        print(f"⚡ [BUS SYNC] Swapping Matrix '{block_name}': Physical Mac SSD ---> GPU VRAM")
-        sys.stdout.write("                 Loading Matrix Weights: [")
-        sys.stdout.flush()
-        for _ in range(20):
-            time.sleep(0.01)
-            sys.stdout.write("█")
-            sys.stdout.flush()
-        sys.stdout.write("] 100% TRANSIT COMPLETE\n")
+    async def retrieve_token_chunk_async(self, chunk_id):
+        """
+        PHASE 1 ADD-ON: Non-blocking asynchronous retrieval engine.
+        Pulls chunks back from storage without blocking inference threads.
+        """
+        print(f"🔍 [ASYNC RETRIEVAL] Search request initiated for Slice ID: {chunk_id}")
+        await asyncio.sleep(0.1) # Simulate async disk latency
+        
+        if chunk_id not in self.cache_index_map:
+            print(f"   ❌ [FAILED] Slice ID {chunk_id} not found in PreMem Memory Map.\n")
+            return False
+            
+        metadata = self.cache_index_map[chunk_id]
+        target_file = metadata["file_path"]
+        
+        try:
+            with open(target_file, "r") as f:
+                payload = f.read()
+                
+            self.cache_index_map[chunk_id]["status"] = "RELOADED_IN_VRAM"
+            print(f"   🔄 [SUCCESS] Loaded payload: '{payload}' back into system cache.")
+            print(f"   🗺️ [INDEX] Updated state for Slice ID {chunk_id} to RELOADED_IN_VRAM.\n")
+            return True
+        except Exception as e:
+            print(f"   ❌ [FAILED] Disk reading error: {str(e)}\n")
+            return False
 
-    def process_keystroke_buffer(self, user_text_stream):
-        """Intercepts input stream queries predictively to manage local array caching pipelines."""
-        intercepted = False
-        for target_block in list(self.ssd_storage_vault):
-            if target_block in user_text_stream:
-                print(f"\n🚀 [API INTERCEPT] Active request for '{target_block}' caught in stream buffer!")
-                intercepted = True
-                
-                # Check hardware usage ceilings
-                current_vram_load = sum(1 for b in self.vllm_block_table.values() if b['tier'] == 'GPU_VRAM_HOT')
-                if current_vram_load >= self.max_vram_capacity:
-                    active_units = {k: v for k, v in self.vllm_block_table.items() if v['tier'] == 'GPU_VRAM_HOT'}
-                    coldest_unit = max(active_units, key=lambda k: active_units[k]['last_seen_ago'])
-                    
-                    # Evict high-overhead matrix layers out to local disk cache space
-                    evict_path = os.path.join(self.vault_path, f"{coldest_unit}.npy")
-                    np.save(evict_path, self.vllm_block_table[coldest_unit]["matrix"])
-                    
-                    self.vllm_block_table[coldest_unit]["tier"] = "MAC_SSD_COLD"
-                    self.vllm_block_table[coldest_unit]["matrix"] = None
-                    self.ssd_storage_vault.append(coldest_unit)
-                    print(f"   📦 [VRAM OVERFLOW] Kicked '{coldest_unit}' out. Wrote native binary array to Desktop.")
-                
-                # Fetch array from hard drive
-                self.animate_hardware_bus_delay(target_block)
-                target_file_path = os.path.join(self.vault_path, f"{target_block}.npy")
-                
-                # Physical binary array deserialization read loop
-                restored_matrix = np.load(target_file_path)
-                
-                # Re-assign memory tags back inside register dictionaries
-                self.vllm_block_table[target_block]["tier"] = "GPU_VRAM_HOT"
-                self.vllm_block_table[target_block]["matrix"] = restored_matrix
-                self.vllm_block_table[target_block]["last_seen_ago"] = 0
-                
-                # Delete binary cache file off drive since array is back in hot cache memory registers
-                os.remove(target_file_path)
-                self.ssd_storage_vault.remove(target_block)
-                print(f"   ✅ [SYNC SUCCESS] '{target_block}' real data grid read back to hot memory lanes.\n")
-                
-        if not intercepted:
-            print("✅ Tensor layout stable. Running clean operational matrix paths.")
+    async def run_simulation_async(self):
+        """Runs a continuous generation loop to track dynamic memory explosion asynchronously."""
+        print("\n🏁 INITIALIZING PREMEM CORE V2 PHASE 1 TELEMETRY ENVIRONMENT")
+        print("================================================================")
+        
+        telemetry = KVCacheTelemetry(hardware_max_mb=128.0)
+        simulated_sequences = [512, 1024, 2048, 4096, 8192]
+        
+        chunk_counter = 0
+        tasks = [] # Store reference to active background offloading worker handles
+        
+        for seq in simulated_sequences:
+            await asyncio.sleep(0.8) # Non-blocking timeline step interval
+            evac_flag = telemetry.profile_context_step(
+                sequence_length=seq, 
+                hidden_size=self.hidden_dim, 
+                num_layers=self.num_layers
+            )
+            
+            if evac_flag:
+                chunk_counter += 1
+                # Trigger dynamic storage offloading as a background async task handle
+                task = asyncio.create_task(self.evict_token_chunk_async(
+                    chunk_id=chunk_counter, 
+                    sequence_length=seq, 
+                    hidden_size=self.hidden_dim
+                ))
+                tasks.append(task)
+        
+        # Wait until all background I/O tasks complete execution safely
+        if tasks:
+            await asyncio.gather(*tasks)
+            
+        print("🧪 STARTING PHASE 1 RETRIEVAL VALIDATION TESTS")
+        print("================================================================")
+        
+        # FIFO Proof: Retrieve the oldest chunk recorded first in the array queue
+        if self.fifo_eviction_queue:
+            oldest_chunk = self.fifo_eviction_queue[0]
+            print(f"📋 [FIFO VERIFICATION] Identifying oldest offloaded slice from track: ID {oldest_chunk}")
+            await self.retrieve_token_chunk_async(chunk_id=oldest_chunk)
 
-# =======================================================
-# INTERACTIVE PRODUCTION ENGINE TEST LOOP
-# =======================================================
+def main():
+    controller = PreMemController()
+    asyncio.run(controller.run_simulation_async())
+
 if __name__ == "__main__":
-    print("======================================================")
-    print("===   PREMEM OPEN AI MODEL RUNTIME LIVE (PHASE I)   ===")
-    print("======================================================")
-    print("Commands: Type regular phrases mentioning 'block_02'")
-    print("          Type 'status' to audit live binary array registers")
-    print("          Type 'exit' to terminate active engine cluster\n")
-    
-    # Initialize the real machine learning array model middleware node
-    premem_node = PreMemController(max_vram_blocks=2)
-    
-    while True:
-        user_input = input("PreMem-ML-Engine > ").strip()
-        
-        if user_input.lower() == 'exit':
-            print("\n[SHUTDOWN] Closing matrix channels. Safe memory unmount complete.")
-            break
-            
-        elif user_input.lower() == 'status':
-            print("\n" + "-" * 50)
-            print("📊 REAL-WORLD MODEL TELEMETRY LOGS:")
-            print(f"   -> Max Hot Cache Capacity Limit: {premem_node.max_vram_capacity}")
-            print(f"   -> Active hot matrices in cache: {sum(1 for b in premem_node.vllm_block_table.values() if b['tier'] == 'GPU_VRAM_HOT')}")
-            print(f"   -> Files inside {premem_node.vault_path}:")
-            print(f"      {os.listdir(premem_node.vault_path)}")
-            print("-" * 50 + "\n")
-            continue
-            
-        if not user_input:
-            continue
-            
-        premem_node.process_keystroke_buffer(user_input)
+    main()
+

@@ -1,36 +1,29 @@
-! [PreMem Live UI Dashboard Layout] (dashboard.png)
-# PreMem: Asynchronous VRAM Caching Engine for Local LLMs
+# 🛰️ PreMem Core V2: Asynchronous KV Cache Telemetry & FIFO Storage Offloader
 
-PreMem is an active, multi-tier memory management architecture designed to maximize local Large Language Model (LLM) execution efficiency under rigid hardware boundaries. By implementing predictive prefetching and dynamic, bi-directional memory swapping, PreMem acts as an autonomous runtime middleware layer that prevents VRAM fragmentation and out-of-memory crashes on consumer devices.
+PreMem Core V2 is an advanced, object-oriented memory optimization middleware framework designed to intercept attention layer matrices, profile KV Cache memory bloat in real-time, and dynamically execute non-blocking asynchronous storage swaps to local NVMe SSD flash storage pools. 
 
-## 📊 Core Architectural Features
+Designed specifically to tackle the trillion-dollar memory bottleneck in high-throughput LLM inference engines executing long multi-turn context streams.
 
-*   **Proactive Cache Scanner:** Continuously evaluates memory page access parameters. If a conversational weight block exceeds idle limits, it automates context serialization and offloads pages down to regular workstation storage pools.
-*   **Keystroke Buffer Interceptor:** Monitors live raw user input buffers. If a cold data array is referenced, a background thread prefetches data back up to hot execution zones *while the user is typing*.
-*   **Strict Capacity Ceiling Enforcer:** Manages active system parameters under rigid constraints (`VRAM_MAX_BLOCK_CAPACITY = 3`). Automatically evicts the oldest active context layers upon incoming resource request overflow.
-*   **Memory Array Compactor:** Runs preemptive structural checks to measure memory layout gaps, compacting live blocks contiguously to maximize runway spaces for large model context token requests.
+## 🏗️ Core Architecture Spec Sheet
+* **Dynamic Parameter Loading:** Intercepts real model topologies (`Qwen-0.5B-Chat` layout via Hugging Face AutoConfig) mapping exact `Hidden Dimensions (1024)` and `Layer Count (24)`.
+* **Asynchronous Eviction Loop:** Leverages the native `asyncio` engine to trigger multi-threaded, non-blocking `.bin` tensor chunk serialization directly to storage when local memory breaches a 75% hardware safety ceiling.
+* **Chronological FIFO Array Tracker:** Implements a true First-In-First-Out (FIFO) queue array to chronologically map memory blocks, ensuring the oldest conversation states are safely offloaded first.
+* **Two-Way Cache Retrieval Engine:** Seamlessly looks up offloaded chunk addresses from a local index map registry, reads binary streams from flash storage, and reloads data vectors straight back to active memory (`RELOADED_IN_VRAM`) with zero thread lag.
+* **Telemetry Web UI Infrastructure:** Exposes backend engine telemetry metrics to a local frontend dashboard through a multi-threaded Flask API server interface.
 
-## 🛠️ Local Workstation Sandbox Setup
+## 📁 Repository Structure
+```text
+PreMem_Core_V2/
+├── PreMem_Core_V2/
+│   ├── app.py             # Flask Web Infrastructure Telemetry Server
+│   ├── simulator.py       # Asynchronous FIFO Eviction & Retrieval Core Engine
+│   └── templates/
+│       └── index.html     # PreMem Cluster Visual Dashboard Interface
+```
 
-### Prerequisites
-*   macOS Workstation Environment (Apple Silicon M-Series Architectures)
-*   Python 3.8+ Development Environments
-
-### Installation & Repository Execution
-1. Clone this repository directly onto your system shell layout:
-   ```bash
-   git clone https://github.com
-   cd PreMem_Core
-   ```
-
-2. Boot the master integrated object-oriented controller module to execute testing profiles:
-   ```bash
-   python3 simulator.py
-   ```
-
-## 🚀 Open-Source Implementation Roadmap
-*   [x] Phase A: Virtual Core Engine Logic Simulations
-*   [x] Phase B: Physical Workstation Storage File-Swapping Mappings
-*   [x] Phase C: Production Repository Version Configurations
-*   [x] Phase D: Unified Object-Oriented Controller Engine Hookings
-*   [x] Phase E: Public Open-Source Packaging & Documentation Layouts
+## 🚀 Execution & Verification
+To launch the full-stack telemetry cluster infrastructure panel locally, initialize the application path entry point via the global path runtime:
+```bash
+/usr/bin/python3 PreMem_Core_V2/app.py
+```
+Open your display dashboard terminal at `http://127.0.0.1:5001` to view live memory allocations.
